@@ -1,12 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const dotenv = require("dotenv");
 const User = require("../model/User");
 const bcrypt = require("bcryptjs");
-const Fb = require("../model/fb");
 const auth = require("./middleware/verifyToken");
-dotenv.config();
+const passport = require('passport');
 
 router.post("/signup", async (req, res) => {
   try {
@@ -47,10 +45,9 @@ router.post("/login", async (req, res) => {
     token,
   });
 });
+
 router.get("/dashboard", auth, (req, res) => {
   res.status(200).send("welcome");
 });
-router.get("/:id", async (req, res) => {
-  
-});
+
 module.exports = router;

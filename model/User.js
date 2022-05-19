@@ -13,7 +13,10 @@ const model = mongoose.Schema({
     password: {
         type: String,
         required: true
-    }
+    },
+    facebookID: String,
+    facebookAccessToken: String,
+    facebookName: String,
 });
 
 module.exports = new mongoose.model("User", model , "users")

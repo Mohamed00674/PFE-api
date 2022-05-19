@@ -1,28 +1,91 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const jwt = require("jsonwebtoken");
 const authRoute = require("./routes/auth");
-const dotenv = require("dotenv");
+const passport = require("passport");
 const session = require("express-session");
-passport = require("passport");
 const FacebookStrategy = require("passport-facebook").Strategy;
-const Pusher = require("pusher");
+const logger = require("morgan");
 
-dotenv.config();
+const User = require("./model/User");
+
 const app = express();
 
+app.use(logger("dev"));
+app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors());
+
+app.use(
+  session({
+    resave: false,
+    saveUninitialized: true,
+    secret: "SECRET",
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+passport.serializeUser(function (user, cb) {
+  cb(null, user);
+});
+
+passport.deserializeUser(function (obj, cb) {
+  cb(null, obj);
+});
+
+
+let isStrategySetup = false;
+function setupStrategy(){
+  return function(req, res, next){
+      if(!isStrategySetup){
+          passport.use(new FacebookStrategy({
+            clientID: "285508587122471",
+            clientSecret: "f86b30855418ec475a6a727a69d1ef26",
+            callbackURL: "http://localhost:2400/auth/facebook/callback",
+              },
+              function (accessToken, refreshToken, profile, done) { 
+                  process.nextTick(function () {
+                    User.findByIdAndUpdate(req.query.id, {
+                      facebookName: profile.displayName,
+                      facebookAccessToken: accessToken,
+                    }, (err, user) => {
+                      done(err, user)
+                    });
+                  });    
+              }
+          ));
+          isStrategySetup = true;
+      }
+
+      next();
+  };
+}
+
+app.get(
+  "/auth/facebook",
+  setupStrategy(),
+  passport.authenticate("facebook", {
+    scope: [
+      "public_profile",
+      "email",
+      "pages_manage_posts",
+    ],
+  })
+);
+
+app.get(
+  "/auth/facebook/callback",
+  passport.authenticate("facebook", {
+    successRedirect: "http://localhost:8081/",
+    failureRedirect: "http://localhost:8081/basic/facebook",
+  })
+);
+
 app.use("/api", authRoute);
 
-const pusher = new Pusher({
-  appId: process.env.PUSHER_APP_ID,
-  key: process.env.PUSHER_KEY,
-  secret: process.env.PUSHER_SECRET,
-  cluster: process.env.PUSHER_CLUSTER,
-});
 const dbURI = "mongodb://localhost:27017/myDatabase";
 
 mongoose.connect(dbURI, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -31,9 +94,11 @@ const db = mongoose.connection;
 db.on("error", (err) => {
   console.error(err);
 });
+
 db.once("open", () => {
   console.log("DB started successfully");
 });
-app.listen(2400, () => {
-  console.log("Server started: 2400");
+
+app.listen(2400, function () {
+  console.log("Express server listening on port " + 2400);
 });
